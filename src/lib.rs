@@ -172,10 +172,36 @@ pub async fn run() {
                     } => control_flow.exit(),
                     WindowEvent::Resized(physical_size) => {
                         state.resize(*physical_size);
-                    }
-                _ => {}
+                    },
+                    WindowEvent::RedrawRequested => {
+                        // This tells winit that we want another frame after this one
+                        state.window().request_redraw();
+            
+                        // if !surface_configured {
+                        //     return;
+                        // }
+            
+                        state.update();
+                        if let Err(e) = state.render() {
+                            match e {
+                                // Reconfigure the surface if it's lost or outdated
+                                wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated => state.resize(state.size),
+                                // The system is out of memory, we should probably quit
+                                wgpu::SurfaceError::OutOfMemory => {
+                                    log::error!("OutOfMemory");
+                                    control_flow.exit();
+                                }
+                                // This happens when the a frame takes too long to present
+                                wgpu::SurfaceError::Timeout => {
+                                    log::warn!("Surface timeout")
+                                }
+                            }
+                        }
+                    },
+                    _ => {}
+                }
             },
             _ => {}
         }
-    });
+    }).expect("Failed to run event loop");
 }
